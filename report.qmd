@@ -16,6 +16,40 @@ When you click the **Render** button a document will be generated that includes 
 1 + 1
 ```
 
+```{python}
+import sys
+import os
+
+# 1. Force package installations directly into RStudio's exact active interpreter path
+try:
+    import yfinance as yf
+    import sklearn
+    import pandas as pd
+except ModuleNotFoundError:
+    print("📦 Environment missing libraries. Forcing background install now...")
+    import subprocess
+    # This bypasses the command line path limits by calling the active binary directly
+    subprocess.run([sys.executable, "-m", "pip", "install", "--user", "yfinance", "scikit-learn", "pandas", "numpy"], check=True)
+    print("✨ Installation complete! Please run the chunk one more time.")
+
+# 2. Setup absolute paths for your modules folder
+base_dir = os.getcwd()
+modules_dir = os.path.join(base_dir, "modules")
+if modules_dir not in sys.path:
+    sys.path.append(modules_dir)
+
+# 3. Import and execute your code files
+try:
+    from data_processing import fetch_and_prepare_data
+    from models import run_pca_analysis, find_optimal_clusters
+
+    prices, scaled_features = fetch_and_prepare_data()
+    pca_model, pca_dataframe = run_pca_analysis(scaled_features)
+    k_values, inertias, silhouettes = find_optimal_clusters(scaled_features, max_k=8)
+except Exception as e:
+    print(f"Pipeline paused: {e}")
+```
+
 You can add options to executable code like this
 
 ```{r}
