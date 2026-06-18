@@ -1,20 +1,11 @@
 ---
-title: "Gold_Project_Report"
+title: "Gold Market Regimes Analysis"
+author: "Jerry Albert Mathew"
 format: html
-editor: visual
+engine: knitr
 ---
 
-## Quarto
-
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
-
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
-
-```{r}
-1 + 1
-```
+The processed data is being imported
 
 ```{python}
 import sys
@@ -67,4 +58,62 @@ final_market_data['Cluster'] = cluster_labels
 # 3. Print a quick count to verify how many days fell into each regime
 print("--- Cluster Distribution ---")
 print(final_market_data['Cluster'].value_counts())
+```
+
+visualisation
+
+```{python}
+import os
+import sys
+import pandas as pd
+import numpy as np
+from sklearn.cluster import KMeans
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# 1. Ensure modules folder path is linked
+base_dir = os.getcwd()
+modules_dir = os.path.join(base_dir, "modules")
+if modules_dir not in sys.path:
+    sys.path.append(modules_dir)
+
+from data_processing import fetch_and_prepare_data
+from models import run_pca_analysis
+
+# 2. Run your mathematical pipeline
+prices, scaled_features = fetch_and_prepare_data()
+pca_model, pca_dataframe = run_pca_analysis(scaled_features)
+
+optimal_k = 3
+kmeans_model = KMeans(n_clusters=optimal_k, random_state=42, n_init=10)
+cluster_labels = kmeans_model.fit_predict(scaled_features)
+
+final_market_data = prices.copy()
+final_market_data['Cluster'] = cluster_labels
+
+# 3. Compute and Print Regime Profile Summary
+features_with_clusters = scaled_features.copy() # using scaled data for profiles or unscaled if preferred
+features_with_clusters['Cluster'] = cluster_labels
+regime_profile = features_with_clusters.groupby('Cluster').mean()
+
+print("\n--- Regime Profiles (Averages) ---")
+print(regime_profile)
+
+# 4. Generate and Save the Regime Plot
+plt.figure(figsize=(12, 6))
+sns.scatterplot(
+    data=final_market_data.reset_index(), 
+    x='Date', 
+    y='GC=F', 
+    hue='Cluster', 
+    palette='Set1',
+    alpha=0.7
+)
+plt.title('Gold Price Timeline Color-Coded by Machine Learning Market Regimes')
+plt.xlabel('Year')
+plt.ylabel('Gold Price (USD)')
+plt.grid(True, alpha=0.3)
+plt.savefig('market_regimes_plot.png', dpi=300)
+plt.close()
+print("✨ Regime visualization saved successfully!")
 ```
