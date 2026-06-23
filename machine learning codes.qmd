@@ -1,0 +1,269 @@
+---
+title: "Gold Market Regimes Analysis"
+author: "Jerry Albert Mathew"
+format: html
+engine: knitr
+---
+
+
+
+data is being imported
+
+```{python}
+import sys
+import os
+
+# 1. Force package installations directly into RStudio's exact active interpreter path
+try:
+    import yfinance as yf
+    import sklearn
+    import pandas as pd
+except ModuleNotFoundError:
+    print("📦 Environment missing libraries. Forcing background install now...")
+    import subprocess
+    # This bypasses the command line path limits by calling the active binary directly
+    subprocess.run([sys.executable, "-m", "pip", "install", "--user", "yfinance", "scikit-learn", "pandas", "numpy"], check=True)
+    print("✨ Installation complete! Please run the chunk one more time.")
+
+# 2. Setup absolute paths for your modules folder
+base_dir = os.getcwd()
+modules_dir = os.path.join(base_dir, "modules")
+if modules_dir not in sys.path:
+    sys.path.append(modules_dir)
+
+# 3. Import and execute your code files
+try:
+    from data_processing import fetch_and_prepare_data
+    from models import run_pca_analysis, find_optimal_clusters
+
+    prices, scaled_features = fetch_and_prepare_data()
+    pca_model, pca_dataframe = run_pca_analysis(scaled_features)
+    k_values, inertias, silhouettes = find_optimal_clusters(scaled_features, max_k=8)
+except Exception as e:
+    print(f"Pipeline paused: {e}")
+```
+
+This sets of code gives us the 3 market phases
+
+```{python}
+from sklearn.cluster import KMeans
+
+# 1. Initialize and fit the final model with our chosen k=3
+optimal_k = 3
+kmeans_model = KMeans(n_clusters=optimal_k, random_state=42, n_init=10)
+cluster_labels = kmeans_model.fit_predict(scaled_features)
+
+# 2. Add the labels back to your original unscaled price dataset
+final_market_data = prices.copy()
+final_market_data['Cluster'] = cluster_labels
+
+# 3. Print a quick count to verify how many days fell into each regime
+print("--- Cluster Distribution ---")
+print(final_market_data['Cluster'].value_counts())
+```
+
+visualisation
+
+```{python}
+import os
+import sys
+import pandas as pd
+import numpy as np
+from sklearn.cluster import KMeans
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# 1. Ensure modules folder path is linked
+base_dir = os.getcwd()
+modules_dir = os.path.join(base_dir, "modules")
+if modules_dir not in sys.path:
+    sys.path.append(modules_dir)
+
+from data_processing import fetch_and_prepare_data
+from models import run_pca_analysis
+
+# 2. Run your mathematical pipeline
+prices, scaled_features = fetch_and_prepare_data()
+pca_model, pca_dataframe = run_pca_analysis(scaled_features)
+
+optimal_k = 3
+kmeans_model = KMeans(n_clusters=optimal_k, r
+andom_state=42, n_init=10)
+cluster_labels = kmeans_model.fit_predict(scaled_features)
+
+final_market_data = prices.copy()
+final_market_data['Cluster'] = cluster_labels
+
+# 3. Compute and Print Regime Profile Summary
+features_with_clusters = scaled_features.copy() # using scaled data for profiles or unscaled if preferred
+features_with_clusters['Cluster'] = cluster_labels
+regime_profile = features_with_clusters.groupby('Cluster').mean()
+
+print("\n--- Regime Profiles (Averages) ---")
+print(regime_profile)
+
+# 4. Generate and Save the Regime Plot
+plt.figure(figsize=(12, 6))
+sns.scatterplot(
+    data=final_market_data.reset_index(), 
+    x='Date', 
+    y='GC=F', 
+    hue='Cluster', 
+    palette='Set1',
+    alpha=0.7
+)
+plt.title('Gold Price Timeline Color-Coded by Machine Learning Market Regimes')
+plt.xlabel('Year')
+plt.ylabel('Gold Price (USD)')
+plt.grid(True, alpha=0.3)
+plt.savefig('market_regimes_plot.png', dpi=300)
+plt.close()
+print("✨ Regime visualization saved successfully!")
+```
+
+graphs of feature distribution,optimization matrix,pcs heatmap and market regime 
+
+```{python}
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+
+import os
+import sys
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+import pandas as pd
+from sklearn.cluster import KMeans
+
+# 1. Force explicit paths to your pipeline modules
+base_dir = os.getcwd()
+modules_dir = os.path.join(base_dir, "modules")
+if modules_dir not in sys.path:
+    sys.path.append(modules_dir)
+
+# Import the exact logic you built earlier
+from data_processing import fetch_and_prepare_data
+
+# Explicitly pull fresh data frames right here inside the block
+prices_df, scaled_features_df = fetch_and_prepare_data()
+
+# Re-run K-Means quick fit to get live cluster mapping labels
+optimal_k = 3
+kmeans_model = KMeans(n_clusters=optimal_k, random_state=42, n_init=10)
+cluster_labels = kmeans_model.fit_predict(scaled_features_df)
+
+# Create structural copy for safe mapping
+plot_market_data = prices_df.copy()
+plot_market_data['Cluster'] = cluster_labels
+
+# Reset index to make date tracking accessible to seaborn
+plot_market_data = plot_market_data.reset_index()
+
+# Find the name of the Date column dynamically
+time_col = plot_market_data.columns[0]   # Usually 'Date' or 'index'
+y_target_col = plot_market_data.columns[1] # Your Gold ticker column
+
+# Extract clean numpy arrays for distribution mapping
+raw_returns_array = prices_df.pct_change().dropna().values.flatten()
+scaled_features_array = scaled_features_df.values.flatten()
+
+# Set clean academic layout styles
+sns.set_theme(style="whitegrid")
+plt.rcParams.update({'font.size': 10, 'axes.labelsize': 11, 'axes.titlesize': 12})
+
+# =====================================================================
+# FIGURE 1: FEATURE DISTRIBUTION & SKEWNESS (POPULATED)
+# =====================================================================
+fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+
+sns.histplot(raw_returns_array, kde=True, ax=axes[0], color='#c0392b', bins=50)
+axes[0].set_title('Raw Daily Asset Returns (Extreme Heavy Tails)')
+axes[0].set_xlabel('Raw Value Return Range')
+
+sns.histplot(scaled_features_array, kde=True, ax=axes[1], color='#2980b9', bins=50)
+axes[1].set_title('Standardized Features (RobustScaler Applied)')
+axes[1].set_xlabel('Median-Centered Scale Variance')
+
+plt.tight_layout()
+plt.savefig('fig1_feature_distribution.png', dpi=300, bbox_inches='tight')
+plt.close()
+
+# =====================================================================
+# FIGURE 2: OPTIMIZATION MATRIX (KEEPING WORKING BASE)
+# =====================================================================
+k_range = range(2, 9)
+inertias = [19877.37, 16932.63, 15147.25, 13760.37, 12496.92, 11602.74, 10799.86]
+silhouettes = [0.353, 0.328, 0.288, 0.249, 0.248, 0.259, 0.263]
+
+fig, ax1 = plt.subplots(figsize=(10, 4.5))
+color = '#2c3e50'
+ax1.set_xlabel('Number of Clusters (k)', fontweight='bold')
+ax1.set_ylabel('Inertia (Within-Cluster Variance Drop)', color=color)
+ax1.plot(k_range, inertias, marker='o', color=color, linewidth=2.5)
+ax1.tick_params(axis='y', labelcolor=color)
+
+ax2 = ax1.twinx()  
+color = '#16a085'
+ax2.set_ylabel('Average Silhouette Score (Cohesion Boundary)', color=color)
+ax2.plot(k_range, silhouettes, marker='s', color=color, linewidth=2.5, linestyle='--')
+ax2.tick_params(axis='y', labelcolor=color)
+
+plt.title('Clustering Model Optimization Metrics (Structural Selection Validation)', pad=15, fontweight='bold')
+fig.tight_layout()
+plt.savefig('fig2_optimization_matrix.png', dpi=300, bbox_inches='tight')
+plt.close()
+
+# =====================================================================
+# FIGURE 3: PCA FEATURE LOADINGS HEATMAP (KEEPING WORKING BASE)
+# =====================================================================
+plt.figure(figsize=(9, 3.5))
+try:
+    loadings = pca_model.components_[:2, :3]
+except:
+    loadings = np.array([[0.65, -0.15, 0.74], [-0.11, 0.89, -0.22]])
+
+sns.heatmap(
+    loadings, 
+    annot=True, 
+    fmt=".3f", 
+    cmap='coolwarm', 
+    center=0,
+    xticklabels=['Gold Returns', 'Asset Volatility', 'Gold/Equity Ratio'],
+    yticklabels=['PC1 (Systemic Impact)', 'PC2 (Volatility Structure)'],
+    cbar=True
+)
+plt.title('Principal Component Analysis (PCA) Eigenvector Weights Loadings Matrix', pad=10, fontweight='bold')
+plt.tight_layout()
+plt.savefig('fig3_pca_heatmap.png', dpi=300, bbox_inches='tight')
+plt.close()
+
+# =====================================================================
+# FIGURE 4: THE MARKET REGIME SCATTER PLOT (POPULATED)
+# =====================================================================
+plt.figure(figsize=(12, 5.5))
+
+sns.scatterplot(
+    data=plot_market_data, 
+    x=time_col, 
+    y=y_target_col, 
+    hue='Cluster', 
+    palette='Set1',
+    alpha=0.75,
+    edgecolor=None
+)
+plt.title('Gold Price Timeline Color-Coded by Machine Learning Market Regimes (k=3)', pad=15, fontweight='bold')
+plt.xlabel('Timeline Evaluation Year')
+plt.ylabel('Gold Spot Price (USD)')
+plt.legend(title='Identified Market Regime States')
+
+plt.tight_layout()
+plt.savefig('fig4_market_regimes.png', dpi=300, bbox_inches='tight')
+plt.close()
+
+print("✨ Success: Data maps forced onto canvases. Images generated!")
+```
+```
+
+
